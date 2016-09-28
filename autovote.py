@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import traceback
@@ -17,15 +18,17 @@ class AutoVote(object):
     def __init__(self):
         self.steem = Node().default()
         self.my_accounts = [x['name'] for x in self.steem.wallet.getAccounts() if x['type'] == 'posting']
-        self.feed_seen_posts = []
-        self.author_subscriptions = ['curie']
-        self.voters_subscriptions = ['furion']
 
-        self.reserve_voting_power = 90
+        self.settings = self.load_json('config.json')
+        self.author_subscriptions = self.settings['author_subscriptions']
+        self.voter_subscriptions = self.settings['voter_subscriptions']
+        self.reserve_voting_power = self.settings['reserve_voting_power']
+
+        self._feed_seen_posts = []
 
     def run(self):
         print("Voting on posts from %d authors." % len(self.author_subscriptions))
-        print("Mirroring votes from %d voters." % len(self.voters_subscriptions))
+        print("Mirroring votes from %d voters." % len(self.voter_subscriptions))
         print("Upvoting from %d accounts: %s" % (len(self.my_accounts), self.my_accounts))
 
         b = Blockchain()
@@ -38,14 +41,14 @@ class AutoVote(object):
                 if op['author'] not in self.author_subscriptions:
                     continue
             elif op_type == "vote":
-                if op['voter'] not in self.voters_subscriptions:
+                if op['voter'] not in self.voter_subscriptions:
                     continue
 
             # Sometimes the feed will give duplicates.
             identifier = "@%s/%s" % (op['author'], op['permlink'])
-            if identifier in self.feed_seen_posts:
+            if identifier in self._feed_seen_posts:
                 continue
-            self.feed_seen_posts = self.feed_seen_posts[-10000:] + [identifier]
+            self._feed_seen_posts = self._feed_seen_posts[-10000:] + [identifier]
 
             # fetch the post
             p = Post(identifier)
@@ -84,10 +87,18 @@ class AutoVote(object):
                 continue
 
             try:
-                # post.vote(100, account)
+                if not self.settings['sim_mode']:
+                    post.vote(100, account)
                 print("====> Upvoted as %s" % account)
             except BroadcastingError as e:
                 print("ERROR: Upvoting with %s failed." % account, str(e))
+
+    @staticmethod
+    def load_json(filename):
+        with open(filename) as data_file:
+            data = json.load(data_file)
+
+        return data
 
 
 if __name__ == "__main__":

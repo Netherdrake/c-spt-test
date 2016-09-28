@@ -1,0 +1,6 @@
+{
+	"author_subscriptions": ["curie"],
+	"voter_subscriptions": ["curie"],
+	"reserve_voting_power": 90,
+	"sim_mode": false
+}
